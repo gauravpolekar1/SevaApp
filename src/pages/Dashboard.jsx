@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { getSchedule } from '../services/api';
+import { getErrorMessage } from '../utils/errorMessage';
 
 function Dashboard() {
   const [schedule, setSchedule] = useState([]);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const load = async () => {
       try {
         const response = await getSchedule();
         setSchedule(response.data.data || []);
-      } catch (error) {
+        setError('');
+      } catch (loadError) {
         setSchedule([]);
+        setError(getErrorMessage(loadError, 'Unable to load dashboard schedule from backend.'));
       }
     };
 
@@ -31,6 +35,7 @@ function Dashboard() {
   return (
     <section className="space-y-4">
       <h1 className="text-2xl font-bold">Seva Dashboard</h1>
+      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="rounded-xl border p-4">
         <h2 className="text-lg font-semibold">Today's Sevas</h2>
         {todaySevas.length === 0 ? <p className="text-sm text-slate-500">No sevas scheduled today.</p> : (

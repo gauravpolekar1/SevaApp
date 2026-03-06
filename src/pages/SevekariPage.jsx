@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 import SevekariForm from '../components/SevekariForm';
 import { createSevekari, getSevekari } from '../services/api';
+import { getErrorMessage } from '../utils/errorMessage';
 
 function SevekariPage() {
   const [sevekari, setSevekari] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const loadSevekari = async () => {
     try {
       const response = await getSevekari();
       setSevekari(response.data.data || []);
-    } catch (error) {
+      setError('');
+    } catch (loadError) {
       setSevekari([]);
+      setError(getErrorMessage(loadError, 'Unable to load sevekari from backend.'));
     }
   };
 
@@ -21,9 +25,16 @@ function SevekariPage() {
 
   const onSubmit = async (payload) => {
     setLoading(true);
+    setError('');
     try {
-      await createSevekari(payload);
+      const response = await createSevekari(payload);
+      if (!response.data?.success) {
+        setError(response.data?.message || 'Unable to create sevekari.');
+        return;
+      }
       await loadSevekari();
+    } catch (submitError) {
+      setError(getErrorMessage(submitError, 'Unable to create sevekari.'));
     } finally {
       setLoading(false);
     }
@@ -32,6 +43,7 @@ function SevekariPage() {
   return (
     <section className="space-y-4">
       <SevekariForm onSubmit={onSubmit} loading={loading} />
+      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="rounded-xl border p-4">
         <h2 className="text-lg font-semibold">Sevekari List</h2>
         <div className="space-y-2 pt-3">
