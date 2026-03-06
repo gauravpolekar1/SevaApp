@@ -2,16 +2,35 @@ const SHEET_NAME_SEVA = 'Seva_Master';
 const SHEET_NAME_SEVEKARI = 'Sevekari_Master';
 const SHEET_NAME_ASSIGNMENT = 'Seva_Assignment';
 const SECRET_KEY = 'CHANGE_ME_SECRET';
+const ALLOWED_ORIGIN = "https://gauravpolekar1.github.io";
+
+function createResponse(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON)
+    .setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    .setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+function doOptions() {
+  return ContentService
+    .createTextOutput("")
+    .setMimeType(ContentService.MimeType.TEXT)
+    .setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
+    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    .setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
 
 function doGet(e) {
   const action = e.parameter.action;
 
-  if (action === 'getSevas') return jsonResponse({ success: true, data: getRows(SHEET_NAME_SEVA) });
-  if (action === 'getSevekari') return jsonResponse({ success: true, data: getRows(SHEET_NAME_SEVEKARI) });
-  if (action === 'getAssignments') return jsonResponse({ success: true, data: getRows(SHEET_NAME_ASSIGNMENT) });
-  if (action === 'getSchedule') return jsonResponse({ success: true, data: buildSchedule() });
+  if (action === 'getSevas') return createResponse({ success: true, data: getRows(SHEET_NAME_SEVA) });
+  if (action === 'getSevekari') return createResponse({ success: true, data: getRows(SHEET_NAME_SEVEKARI) });
+  if (action === 'getAssignments') return createResponse({ success: true, data: getRows(SHEET_NAME_ASSIGNMENT) });
+  if (action === 'getSchedule') return createResponse({ success: true, data: buildSchedule() });
 
-  return jsonResponse({ success: false, message: 'Invalid action' });
+  return createResponse({ success: false, message: 'Invalid action' });
 }
 
 function doPost(e) {
@@ -19,14 +38,14 @@ function doPost(e) {
   const payload = JSON.parse(e.postData.contents || '{}');
 
   if (payload.secretKey !== SECRET_KEY) {
-    return jsonResponse({ success: false, message: 'Unauthorized' });
+    return createResponse({ success: false, message: 'Unauthorized' });
   }
 
-  if (action === 'createSeva') return jsonResponse(createSeva(payload));
-  if (action === 'createSevekari') return jsonResponse(createSevekari(payload));
-  if (action === 'assignSeva') return jsonResponse(assignSeva(payload));
+  if (action === 'createSeva') return createResponse(createSeva(payload));
+  if (action === 'createSevekari') return createResponse(createSevekari(payload));
+  if (action === 'assignSeva') return createResponse(assignSeva(payload));
 
-  return jsonResponse({ success: false, message: 'Invalid action' });
+  return createResponse({ success: false, message: 'Invalid action' });
 }
 
 function createSeva(payload) {
@@ -180,6 +199,6 @@ function mapById(rows, idField) {
   }, {});
 }
 
-function jsonResponse(payload) {
-  return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
-}
+//function jsonResponse(payload) {
+  //return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+//}
