@@ -4,7 +4,13 @@ const SHEET_NAME_ASSIGNMENT = 'Seva_Assignment';
 const SECRET_KEY = 'CHANGE_ME_SECRET';
 const ALLOWED_ORIGIN = "https://gauravpolekar1.github.io";
 
-function createResponse(data) {
+function createResponse(data, callback) {
+  if (callback) {
+    return ContentService
+      .createTextOutput(callback + '(' + JSON.stringify(data) + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON)
@@ -24,13 +30,14 @@ function doOptions() {
 
 function doGet(e) {
   const action = e.parameter.action;
+  const callback = (e.parameter && e.parameter.callback) || '';
 
-  if (action === 'getSevas') return createResponse({ success: true, data: getRows(SHEET_NAME_SEVA) });
-  if (action === 'getSevekari') return createResponse({ success: true, data: getRows(SHEET_NAME_SEVEKARI) });
-  if (action === 'getAssignments') return createResponse({ success: true, data: getRows(SHEET_NAME_ASSIGNMENT) });
-  if (action === 'getSchedule') return createResponse({ success: true, data: buildSchedule() });
+  if (action === 'getSevas') return createResponse({ success: true, data: getRows(SHEET_NAME_SEVA) }, callback);
+  if (action === 'getSevekari') return createResponse({ success: true, data: getRows(SHEET_NAME_SEVEKARI) }, callback);
+  if (action === 'getAssignments') return createResponse({ success: true, data: getRows(SHEET_NAME_ASSIGNMENT) }, callback);
+  if (action === 'getSchedule') return createResponse({ success: true, data: buildSchedule() }, callback);
 
-  return createResponse({ success: false, message: 'Invalid action' });
+  return createResponse({ success: false, message: 'Invalid action' }, callback);
 }
 
 function doPost(e) {

@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 import SevaForm from '../components/SevaForm';
 import { createSeva, getSevas } from '../services/api';
+import { getErrorMessage } from '../utils/errorMessage';
 
 function SevaPage() {
   const [sevas, setSevas] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const loadSevas = async () => {
     try {
       const response = await getSevas();
       setSevas(response.data.data || []);
-    } catch (error) {
+      setError('');
+    } catch (loadError) {
       setSevas([]);
+      setError(getErrorMessage(loadError, 'Unable to load sevas from backend.'));
     }
   };
 
@@ -21,9 +25,16 @@ function SevaPage() {
 
   const onSubmit = async (payload) => {
     setLoading(true);
+    setError('');
     try {
-      await createSeva(payload);
+      const response = await createSeva(payload);
+      if (!response.data?.success) {
+        setError(response.data?.message || 'Unable to create seva.');
+        return;
+      }
       await loadSevas();
+    } catch (submitError) {
+      setError(getErrorMessage(submitError, 'Unable to create seva.'));
     } finally {
       setLoading(false);
     }
@@ -32,6 +43,7 @@ function SevaPage() {
   return (
     <section className="space-y-4">
       <SevaForm onSubmit={onSubmit} loading={loading} />
+      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="rounded-xl border p-4">
         <h2 className="text-lg font-semibold">Seva List</h2>
         <div className="space-y-2 pt-3">

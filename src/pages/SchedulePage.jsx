@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AssignmentForm from '../components/AssignmentForm';
 import CalendarView from '../components/CalendarView';
 import { assignSeva, getSchedule, getSevas, getSevekari } from '../services/api';
+import { getErrorMessage } from '../utils/errorMessage';
 
 function SchedulePage() {
   const [sevas, setSevas] = useState([]);
@@ -16,10 +17,12 @@ function SchedulePage() {
       setSevas(sevaRes.data.data || []);
       setSevekari(sevekariRes.data.data || []);
       setSchedule(scheduleRes.data.data || []);
-    } catch (e) {
+      setError('');
+    } catch (loadError) {
       setSevas([]);
       setSevekari([]);
       setSchedule([]);
+      setError(getErrorMessage(loadError, 'Unable to load scheduling data from backend.'));
     }
   };
 
@@ -37,6 +40,8 @@ function SchedulePage() {
         return;
       }
       await loadData();
+    } catch (submitError) {
+      setError(getErrorMessage(submitError, 'Unable to assign seva.'));
     } finally {
       setLoading(false);
     }

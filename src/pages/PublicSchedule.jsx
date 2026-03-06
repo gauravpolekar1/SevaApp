@@ -6,6 +6,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import ViewToggle from '../components/ViewToggle';
 import ScheduleList from '../components/ScheduleList';
 import { getSchedule } from '../services/api';
+import { getErrorMessage } from '../utils/errorMessage';
 
 const CACHE_KEY = 'public-seva-schedule-cache-v1';
 const CACHE_TTL_MS = 60 * 1000;
@@ -16,6 +17,7 @@ function PublicSchedule() {
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [error, setError] = useState('');
 
   const loadSchedule = async ({ silent = false } = {}) => {
     if (!silent) {
@@ -28,6 +30,7 @@ function PublicSchedule() {
         const parsed = JSON.parse(raw);
         if (Date.now() - parsed.timestamp < CACHE_TTL_MS) {
           setSchedule(parsed.data || []);
+          setError('');
           if (!silent) setLoading(false);
           return;
         }
@@ -36,6 +39,7 @@ function PublicSchedule() {
       const response = await getSchedule();
       const data = response.data?.data || [];
       setSchedule(data);
+      setError('');
       localStorage.setItem(
         CACHE_KEY,
         JSON.stringify({
@@ -43,8 +47,9 @@ function PublicSchedule() {
           data,
         })
       );
-    } catch (error) {
+    } catch (loadError) {
       setSchedule([]);
+      setError(getErrorMessage(loadError, 'Unable to load schedule from backend.'));
     } finally {
       if (!silent) {
         setLoading(false);
@@ -103,6 +108,8 @@ function PublicSchedule() {
           </button>
         </div>
       </header>
+
+      {error && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
       {loading ? (
         <p className="rounded-lg border p-3 text-sm text-slate-500">Loading schedule...</p>
