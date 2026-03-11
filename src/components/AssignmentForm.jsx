@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import DayPicker from './DayPicker';
 
 const initialState = {
   seva_id: '',
@@ -37,7 +38,12 @@ function AssignmentForm({ sevas, sevekari, onSubmit, loading }) {
         <input className="rounded border p-3" type="date" value={formData.start_date} onChange={(e) => setFormData({ ...formData, start_date: e.target.value })} required />
         <input className="rounded border p-3" type="date" value={formData.end_date} onChange={(e) => setFormData({ ...formData, end_date: e.target.value })} required />
       </div>
-      <input className="w-full rounded border p-3" placeholder="Days e.g. Mon,Tue" value={formData.recurrence_days} onChange={(e) => setFormData({ ...formData, recurrence_days: e.target.value })} required />
+      <DayPicker
+        label="Recurrence days"
+        required
+        value={formData.recurrence_days}
+        onChange={(recurrence_days) => setFormData({ ...formData, recurrence_days })}
+      />
       <button className="w-full rounded bg-orange-600 p-3 font-medium text-white" disabled={loading} type="submit">{loading ? 'Assigning...' : 'Assign Seva'}</button>
     </form>
   );
