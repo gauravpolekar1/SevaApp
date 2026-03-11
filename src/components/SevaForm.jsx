@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import DayPicker from './DayPicker';
 
 const initialState = {
   seva_name: '',
@@ -27,7 +28,12 @@ function SevaForm({ onSubmit, loading }) {
         <input className="rounded border p-3" type="time" value={formData.start_time} onChange={(e) => setFormData({ ...formData, start_time: e.target.value })} required />
         <input className="rounded border p-3" type="time" value={formData.end_time} onChange={(e) => setFormData({ ...formData, end_time: e.target.value })} required />
       </div>
-      <input className="w-full rounded border p-3" placeholder="Days e.g. Mon,Tue" value={formData.recurrence_days} onChange={(e) => setFormData({ ...formData, recurrence_days: e.target.value })} required />
+      <DayPicker
+        label="Recurrence days"
+        required
+        value={formData.recurrence_days}
+        onChange={(recurrence_days) => setFormData({ ...formData, recurrence_days })}
+      />
       <button className="w-full rounded bg-orange-600 p-3 font-medium text-white" disabled={loading} type="submit">{loading ? 'Saving...' : 'Save Seva'}</button>
     </form>
   );
