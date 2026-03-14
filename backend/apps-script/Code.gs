@@ -2,7 +2,9 @@ const SHEET_NAME_SEVA = 'Seva_Master';
 const SHEET_NAME_SEVEKARI = 'Sevekari_Master';
 const SHEET_NAME_ASSIGNMENT = 'Seva_Assignment';
 const SECRET_KEY = 'CHANGE_ME_SECRET';
-const ALLOWED_ORIGIN = "https://gauravpolekar1.github.io";
+// Allowed origins: production and local dev. Apps Script cannot read request Origin, so we use "*" to allow both.
+const ALLOWED_ORIGINS = ["https://gauravpolekar1.github.io", "http://localhost:5173"];
+const ALLOWED_ORIGIN = "*"; // CORS: allow both ALLOWED_ORIGINS (GAS cannot set origin dynamically)
 
 function createResponse(data, callback) {
   if (callback) {
@@ -42,7 +44,19 @@ function doGet(e) {
 
 function doPost(e) {
   const action = (e.parameter && e.parameter.action) || '';
-  const payload = JSON.parse(e.postData.contents || '{}');
+  const rawBody = (e.postData && e.postData.contents) || '';
+  let payload = {};
+  try {
+    // Support both JSON body and form-urlencoded (payload=JSON) for CORS compatibility
+    if (rawBody.trim().startsWith('{')) {
+      payload = JSON.parse(rawBody);
+    } else {
+      const params = parseFormUrlEncoded(rawBody);
+      payload = params.payload ? JSON.parse(params.payload) : {};
+    }
+  } catch (err) {
+    return createResponse({ success: false, message: 'Invalid request body' });
+  }
 
   if (payload.secretKey !== SECRET_KEY) {
     return createResponse({ success: false, message: 'Unauthorized' });
@@ -204,6 +218,19 @@ function mapById(rows, idField) {
     acc[row[idField]] = row;
     return acc;
   }, {});
+}
+
+function parseFormUrlEncoded(str) {
+  const out = {};
+  if (!str) return out;
+  str.split('&').forEach(function (pair) {
+    const i = pair.indexOf('=');
+    if (i === -1) return;
+    const key = decodeURIComponent(pair.substring(0, i).replace(/\+/g, ' '));
+    const val = decodeURIComponent(pair.substring(i + 1).replace(/\+/g, ' '));
+    out[key] = val;
+  });
+  return out;
 }
 
 //function jsonResponse(payload) {

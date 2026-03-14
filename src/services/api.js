@@ -3,10 +3,12 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL;
 const SECRET_KEY = import.meta.env.VITE_API_SECRET;
 
+// Use form-urlencoded for POST to avoid CORS preflight (Google Apps Script
+// does not handle OPTIONS; only simple requests reach doPost with CORS headers).
 const client = axios.create({
   baseURL: API_URL,
   headers: {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/x-www-form-urlencoded',
   },
 });
 
@@ -57,11 +59,12 @@ export const getSevekari = () => getViaJsonp('getSevekari');
 export const getAssignments = () => getViaJsonp('getAssignments');
 export const getSchedule = () => getViaJsonp('getSchedule');
 
-export const createSeva = (payload) =>
-  client.post('?action=createSeva', { ...payload, secretKey: SECRET_KEY });
+const postForm = (action, payload) => {
+  const body = new URLSearchParams();
+  body.set('payload', JSON.stringify({ ...payload, secretKey: SECRET_KEY }));
+  return client.post(`?action=${action}`, body.toString());
+};
 
-export const createSevekari = (payload) =>
-  client.post('?action=createSevekari', { ...payload, secretKey: SECRET_KEY });
-
-export const assignSeva = (payload) =>
-  client.post('?action=assignSeva', { ...payload, secretKey: SECRET_KEY });
+export const createSeva = (payload) => postForm('createSeva', payload);
+export const createSevekari = (payload) => postForm('createSevekari', payload);
+export const assignSeva = (payload) => postForm('assignSeva', payload);
