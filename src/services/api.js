@@ -1,17 +1,7 @@
-import axios from 'axios';
-
 const API_URL = import.meta.env.VITE_API_URL;
 const SECRET_KEY = import.meta.env.VITE_API_SECRET;
 
-// Use form-urlencoded for POST to avoid CORS preflight (Google Apps Script
-// does not handle OPTIONS; only simple requests reach doPost with CORS headers).
-const client = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/x-www-form-urlencoded',
-  },
-});
-
+// GET via JSONP to avoid CORS (script tag).
 const getViaJsonp = (action) =>
   new Promise((resolve, reject) => {
     if (!API_URL) {
@@ -59,12 +49,44 @@ export const getSevekari = () => getViaJsonp('getSevekari');
 export const getAssignments = () => getViaJsonp('getAssignments');
 export const getSchedule = () => getViaJsonp('getSchedule');
 
-const postForm = (action, payload) => {
-  const body = new URLSearchParams();
-  body.set('payload', JSON.stringify({ ...payload, secretKey: SECRET_KEY }));
-  return client.post(`?action=${action}`, body.toString());
+// POST as simple request (text/plain) to avoid CORS preflight; backend accepts JSON body.
+const postSimple = async (action, payload) => {
+  if (!API_URL) {
+    throw new Error('VITE_API_URL is not configured.');
+  }
+  const url = `${API_URL.replace(/\?$/, '')}${API_URL.includes('?') ? '&' : '?'}action=${encodeURIComponent(action)}`;
+  const body = JSON.stringify({ ...payload, secretKey: SECRET_KEY, action });
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/plain;charset=utf-8',
+    },
+    body,
+  });
+
+  let parsed;
+  const contentType = response.headers.get('Content-Type') || '';
+  try {
+    if (contentType.includes('application/json')) {
+      parsed = await response.json();
+    } else {
+      const text = await response.text();
+      parsed = text ? JSON.parse(text) : {};
+    }
+  } catch {
+    parsed = { success: false, message: 'Invalid response from server' };
+  }
+
+  if (!response.ok) {
+    const err = new Error(parsed?.message || `Request failed (${response.status})`);
+    err.response = { data: parsed, status: response.status };
+    throw err;
+  }
+
+  return { data: parsed };
 };
 
-export const createSeva = (payload) => postForm('createSeva', payload);
-export const createSevekari = (payload) => postForm('createSevekari', payload);
-export const assignSeva = (payload) => postForm('assignSeva', payload);
+export const createSeva = (payload) => postSimple('createSeva', payload);
+export const createSevekari = (payload) => postSimple('createSevekari', payload);
+export const assignSeva = (payload) => postSimple('assignSeva', payload);

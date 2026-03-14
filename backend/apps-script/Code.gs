@@ -2,9 +2,6 @@ const SHEET_NAME_SEVA = 'Seva_Master';
 const SHEET_NAME_SEVEKARI = 'Sevekari_Master';
 const SHEET_NAME_ASSIGNMENT = 'Seva_Assignment';
 const SECRET_KEY = 'CHANGE_ME_SECRET';
-// Allowed origins: production and local dev. Apps Script cannot read request Origin, so we use "*" to allow both.
-const ALLOWED_ORIGINS = ["https://gauravpolekar1.github.io", "http://localhost:5173"];
-const ALLOWED_ORIGIN = "*"; // CORS: allow both ALLOWED_ORIGINS (GAS cannot set origin dynamically)
 
 function createResponse(data, callback) {
   if (callback) {
@@ -15,62 +12,69 @@ function createResponse(data, callback) {
 
   return ContentService
     .createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON)
-    .setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
-    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    .setHeader("Access-Control-Allow-Headers", "Content-Type");
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function doOptions() {
   return ContentService
     .createTextOutput("")
-    .setMimeType(ContentService.MimeType.TEXT)
-    .setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN)
-    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    .setHeader("Access-Control-Allow-Headers", "Content-Type");
+    .setMimeType(ContentService.MimeType.TEXT);
 }
 
 function doGet(e) {
-  const action = e.parameter.action;
-  const callback = (e.parameter && e.parameter.callback) || '';
+  try {
+    const params = (e && e.parameter) || {};
+    const action = params.action;
+    const callback = params.callback || '';
 
-  if (action === 'getSevas') return createResponse({ success: true, data: getRows(SHEET_NAME_SEVA) }, callback);
-  if (action === 'getSevekari') return createResponse({ success: true, data: getRows(SHEET_NAME_SEVEKARI) }, callback);
-  if (action === 'getAssignments') return createResponse({ success: true, data: getRows(SHEET_NAME_ASSIGNMENT) }, callback);
-  if (action === 'getSchedule') return createResponse({ success: true, data: buildSchedule() }, callback);
+    if (action === 'getSevas') return createResponse({ success: true, data: getRows(SHEET_NAME_SEVA) }, callback);
+    if (action === 'getSevekari') return createResponse({ success: true, data: getRows(SHEET_NAME_SEVEKARI) }, callback);
+    if (action === 'getAssignments') return createResponse({ success: true, data: getRows(SHEET_NAME_ASSIGNMENT) }, callback);
+    if (action === 'getSchedule') return createResponse({ success: true, data: buildSchedule() }, callback);
 
-  return createResponse({ success: false, message: 'Invalid action' }, callback);
+    return createResponse({ success: false, message: 'Invalid action' }, callback);
+  } catch (err) {
+    return createResponse({ success: false, message: 'Internal server error: ' + (err.message || err.toString()) });
+  }
 }
 
 function doPost(e) {
-  const action = (e.parameter && e.parameter.action) || '';
-  const rawBody = (e.postData && e.postData.contents) || '';
-  let payload = {};
   try {
-    // Support both JSON body and form-urlencoded (payload=JSON) for CORS compatibility
-    if (rawBody.trim().startsWith('{')) {
-      payload = JSON.parse(rawBody);
-    } else {
-      const params = parseFormUrlEncoded(rawBody);
-      payload = params.payload ? JSON.parse(params.payload) : {};
+    const params = (e && e.parameter) || {};
+    const rawBody = (e && e.postData && e.postData.contents) ? String(e.postData.contents) : '';
+    let payload = {};
+    try {
+      // Support both JSON body and form-urlencoded (payload=JSON) for CORS compatibility
+      if (rawBody.trim().startsWith('{')) {
+        payload = JSON.parse(rawBody);
+      } else {
+        const formParams = parseFormUrlEncoded(rawBody);
+        payload = formParams.payload ? JSON.parse(formParams.payload) : {};
+      }
+    } catch (parseErr) {
+      return createResponse({ success: false, message: 'Invalid request body' });
     }
+
+    if (payload.secretKey !== SECRET_KEY) {
+      return createResponse({ success: false, message: 'Unauthorized' });
+    }
+
+    // Action can be in URL query (e.parameter) or in JSON body (payload.action) - POST often omits query in e.parameter
+    const action = params.action || payload.action || '';
+
+    if (action === 'createSeva') return createResponse(createSeva(payload));
+    if (action === 'createSevekari') return createResponse(createSevekari(payload));
+    if (action === 'assignSeva') return createResponse(assignSeva(payload));
+
+    return createResponse({ success: false, message: 'Invalid action' });
   } catch (err) {
-    return createResponse({ success: false, message: 'Invalid request body' });
+    return createResponse({ success: false, message: 'Internal server error: ' + (err.message || err.toString()) });
   }
-
-  if (payload.secretKey !== SECRET_KEY) {
-    return createResponse({ success: false, message: 'Unauthorized' });
-  }
-
-  if (action === 'createSeva') return createResponse(createSeva(payload));
-  if (action === 'createSevekari') return createResponse(createSevekari(payload));
-  if (action === 'assignSeva') return createResponse(assignSeva(payload));
-
-  return createResponse({ success: false, message: 'Invalid action' });
 }
 
 function createSeva(payload) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_SEVA);
+  if (!sheet) return { success: false, message: 'Sheet not found: ' + SHEET_NAME_SEVA };
   const sevaId = 'SEVA-' + new Date().getTime();
   sheet.appendRow([
     sevaId,
@@ -88,6 +92,7 @@ function createSeva(payload) {
 
 function createSevekari(payload) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_SEVEKARI);
+  if (!sheet) return { success: false, message: 'Sheet not found: ' + SHEET_NAME_SEVEKARI };
   const sevekariId = 'SEVEKARI-' + new Date().getTime();
   sheet.appendRow([
     sevekariId,
@@ -125,7 +130,9 @@ function assignSeva(payload) {
   }
 
   const assignmentId = 'ASSIGN-' + new Date().getTime();
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_ASSIGNMENT).appendRow([
+  const assignmentSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_ASSIGNMENT);
+  if (!assignmentSheet) return { success: false, message: 'Sheet not found: ' + SHEET_NAME_ASSIGNMENT };
+  assignmentSheet.appendRow([
     assignmentId,
     payload.seva_id,
     payload.sevekari_id,
@@ -169,6 +176,7 @@ function buildSchedule() {
 }
 
 function expandDates(startDate, endDate, recurrenceDays) {
+  if (!recurrenceDays || typeof recurrenceDays !== 'string') return [];
   const wantedDays = recurrenceDays.split(',').map(function (d) { return d.trim(); });
   const dayMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const start = new Date(startDate + 'T00:00:00');
@@ -200,6 +208,7 @@ function toMinutes(timeText) {
 
 function getRows(sheetName) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return [];
   const values = sheet.getDataRange().getValues();
   if (values.length < 2) return [];
   const headers = values[0];
