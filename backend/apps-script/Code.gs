@@ -97,17 +97,26 @@ function createSeva(payload) {
 }
 
 function updateSeva(payload) {
+  const sevas = mapById(getRows(SHEET_NAME_SEVA), 'seva_id');
+  const existingSeva = sevas[payload.seva_id];
+  if (!existingSeva) return { success: false, message: 'seva_id not found' };
+
+  const nextStartTime = payload.start_time || existingSeva.start_time;
+  const nextEndTime = payload.end_time || existingSeva.end_time;
+  const overlapValidation = validateSevaUpdateConflict(payload.seva_id, nextStartTime, nextEndTime);
+  if (!overlapValidation.success) return overlapValidation;
+
   return updateRowById(
     SHEET_NAME_SEVA,
     'seva_id',
     payload.seva_id,
     {
-      seva_name: payload.seva_name,
-      description: payload.description,
-      start_time: payload.start_time,
-      end_time: payload.end_time,
-      recurrence_type: payload.recurrence_type || 'weekly',
-      recurrence_days: payload.recurrence_days,
+      seva_name: payload.seva_name || existingSeva.seva_name,
+      description: payload.description || existingSeva.description,
+      start_time: nextStartTime,
+      end_time: nextEndTime,
+      recurrence_type: payload.recurrence_type || existingSeva.recurrence_type || 'weekly',
+      recurrence_days: payload.recurrence_days || existingSeva.recurrence_days,
       updated_at: new Date().toISOString()
     }
   );
@@ -219,6 +228,39 @@ function validateAssignmentConflict(payload, excludedAssignmentId) {
 
     if (conflict) {
       return { success: false, message: 'Time conflict detected' };
+    }
+  }
+
+  return { success: true };
+}
+
+function validateSevaUpdateConflict(sevaId, nextStartTime, nextEndTime) {
+  const assignments = getRows(SHEET_NAME_ASSIGNMENT).filter(function (assignment) {
+    return String(assignment.seva_id) === String(sevaId);
+  });
+
+  if (assignments.length === 0) return { success: true };
+
+  const schedule = buildSchedule();
+
+  for (let i = 0; i < assignments.length; i += 1) {
+    const assignment = assignments[i];
+    const expandedDates = expandDates(assignment.start_date, assignment.end_date, assignment.recurrence_days);
+
+    for (let j = 0; j < expandedDates.length; j += 1) {
+      const currentDate = expandedDates[j];
+      const conflict = schedule.some(function (event) {
+        if (event.assignment_id === assignment.assignment_id) return false;
+        if (event.sevekari_id !== assignment.sevekari_id || event.date !== currentDate) return false;
+        return timeOverlap(nextStartTime, nextEndTime, event.start_time, event.end_time);
+      });
+
+      if (conflict) {
+        return {
+          success: false,
+          message: 'Time conflict detected for existing assignment(s). Update blocked.'
+        };
+      }
     }
   }
 
