@@ -120,5 +120,13 @@ const postSimple = async (action, payload) => {
 };
 
 export const createSeva = (payload) => postSimple('createSeva', payload);
+export const updateSeva = (payload) => postSimple('updateSeva', payload);
+export const deleteSeva = (seva_id) => postSimple('deleteSeva', { seva_id });
+
 export const createSevekari = (payload) => postSimple('createSevekari', payload);
+export const updateSevekari = (payload) => postSimple('updateSevekari', payload);
+export const deleteSevekari = (sevekari_id) => postSimple('deleteSevekari', { sevekari_id });
+
 export const assignSeva = (payload) => postSimple('assignSeva', payload);
+export const updateAssignment = (payload) => postSimple('updateAssignment', payload);
+export const deleteAssignment = (assignment_id) => postSimple('deleteAssignment', { assignment_id });

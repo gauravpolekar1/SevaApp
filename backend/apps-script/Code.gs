@@ -17,7 +17,7 @@ function createResponse(data, callback) {
 
 function doOptions() {
   return ContentService
-    .createTextOutput("")
+    .createTextOutput('')
     .setMimeType(ContentService.MimeType.TEXT);
 }
 
@@ -63,8 +63,14 @@ function doPost(e) {
     const action = params.action || payload.action || '';
 
     if (action === 'createSeva') return createResponse(createSeva(payload));
+    if (action === 'updateSeva') return createResponse(updateSeva(payload));
+    if (action === 'deleteSeva') return createResponse(deleteSeva(payload));
     if (action === 'createSevekari') return createResponse(createSevekari(payload));
+    if (action === 'updateSevekari') return createResponse(updateSevekari(payload));
+    if (action === 'deleteSevekari') return createResponse(deleteSevekari(payload));
     if (action === 'assignSeva') return createResponse(assignSeva(payload));
+    if (action === 'updateAssignment') return createResponse(updateAssignment(payload));
+    if (action === 'deleteAssignment') return createResponse(deleteAssignment(payload));
 
     return createResponse({ success: false, message: 'Invalid action' });
   } catch (err) {
@@ -90,6 +96,27 @@ function createSeva(payload) {
   return { success: true, data: { seva_id: sevaId } };
 }
 
+function updateSeva(payload) {
+  return updateRowById(
+    SHEET_NAME_SEVA,
+    'seva_id',
+    payload.seva_id,
+    {
+      seva_name: payload.seva_name,
+      description: payload.description,
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+      recurrence_type: payload.recurrence_type || 'weekly',
+      recurrence_days: payload.recurrence_days,
+      updated_at: new Date().toISOString()
+    }
+  );
+}
+
+function deleteSeva(payload) {
+  return deleteRowById(SHEET_NAME_SEVA, 'seva_id', payload.seva_id);
+}
+
 function createSevekari(payload) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_SEVEKARI);
   if (!sheet) return { success: false, message: 'Sheet not found: ' + SHEET_NAME_SEVEKARI };
@@ -107,27 +134,29 @@ function createSevekari(payload) {
   return { success: true, data: { sevekari_id: sevekariId } };
 }
 
-function assignSeva(payload) {
-  const schedule = buildSchedule();
-  const sevas = mapById(getRows(SHEET_NAME_SEVA), 'seva_id');
-  const selectedSeva = sevas[payload.seva_id];
-
-  if (!selectedSeva) {
-    return { success: false, message: 'Invalid seva_id' };
-  }
-
-  const expandedDates = expandDates(payload.start_date, payload.end_date, payload.recurrence_days);
-  for (let i = 0; i < expandedDates.length; i++) {
-    const currentDate = expandedDates[i];
-    const conflict = schedule.some((event) => {
-      if (event.sevekari_id !== payload.sevekari_id || event.date !== currentDate) return false;
-      return timeOverlap(selectedSeva.start_time, selectedSeva.end_time, event.start_time, event.end_time);
-    });
-
-    if (conflict) {
-      return { success: false, message: 'Time conflict detected' };
+function updateSevekari(payload) {
+  return updateRowById(
+    SHEET_NAME_SEVEKARI,
+    'sevekari_id',
+    payload.sevekari_id,
+    {
+      name: payload.name,
+      phone: payload.phone,
+      email: payload.email,
+      availability_days: payload.availability_days,
+      notes: payload.notes,
+      updated_at: new Date().toISOString()
     }
-  }
+  );
+}
+
+function deleteSevekari(payload) {
+  return deleteRowById(SHEET_NAME_SEVEKARI, 'sevekari_id', payload.sevekari_id);
+}
+
+function assignSeva(payload) {
+  const assignmentValidation = validateAssignmentConflict(payload);
+  if (!assignmentValidation.success) return assignmentValidation;
 
   const assignmentId = 'ASSIGN-' + new Date().getTime();
   const assignmentSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME_ASSIGNMENT);
@@ -144,6 +173,56 @@ function assignSeva(payload) {
   ]);
 
   return { success: true, data: { assignment_id: assignmentId } };
+}
+
+function updateAssignment(payload) {
+  const assignmentValidation = validateAssignmentConflict(payload, payload.assignment_id);
+  if (!assignmentValidation.success) return assignmentValidation;
+
+  return updateRowById(
+    SHEET_NAME_ASSIGNMENT,
+    'assignment_id',
+    payload.assignment_id,
+    {
+      seva_id: payload.seva_id,
+      sevekari_id: payload.sevekari_id,
+      start_date: payload.start_date,
+      end_date: payload.end_date,
+      recurrence_type: payload.recurrence_type || 'weekly',
+      recurrence_days: payload.recurrence_days,
+      updated_at: new Date().toISOString()
+    }
+  );
+}
+
+function deleteAssignment(payload) {
+  return deleteRowById(SHEET_NAME_ASSIGNMENT, 'assignment_id', payload.assignment_id);
+}
+
+function validateAssignmentConflict(payload, excludedAssignmentId) {
+  const schedule = buildSchedule();
+  const sevas = mapById(getRows(SHEET_NAME_SEVA), 'seva_id');
+  const selectedSeva = sevas[payload.seva_id];
+
+  if (!selectedSeva) {
+    return { success: false, message: 'Invalid seva_id' };
+  }
+
+  const expandedDates = expandDates(payload.start_date, payload.end_date, payload.recurrence_days);
+  for (let i = 0; i < expandedDates.length; i++) {
+    const currentDate = expandedDates[i];
+    const conflict = schedule.some(function (event) {
+      if (excludedAssignmentId && event.assignment_id === excludedAssignmentId) return false;
+      if (event.sevekari_id !== payload.sevekari_id || event.date !== currentDate) return false;
+      return timeOverlap(selectedSeva.start_time, selectedSeva.end_time, event.start_time, event.end_time);
+    });
+
+    if (conflict) {
+      return { success: false, message: 'Time conflict detected' };
+    }
+  }
+
+  return { success: true };
 }
 
 function buildSchedule() {
@@ -255,6 +334,53 @@ function mapById(rows, idField) {
   }, {});
 }
 
+function updateRowById(sheetName, idField, idValue, updates) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return { success: false, message: 'Sheet not found: ' + sheetName };
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return { success: false, message: 'No records found.' };
+
+  const headers = values[0];
+  const idColumn = headers.indexOf(idField);
+  if (idColumn === -1) return { success: false, message: 'Invalid id field: ' + idField };
+
+  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+    if (String(values[rowIndex][idColumn]) !== String(idValue)) continue;
+
+    headers.forEach(function (header, index) {
+      if (Object.prototype.hasOwnProperty.call(updates, header)) {
+        values[rowIndex][index] = updates[header];
+      }
+    });
+
+    sheet.getRange(rowIndex + 1, 1, 1, headers.length).setValues([values[rowIndex]]);
+    return { success: true };
+  }
+
+  return { success: false, message: idField + ' not found' };
+}
+
+function deleteRowById(sheetName, idField, idValue) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) return { success: false, message: 'Sheet not found: ' + sheetName };
+
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return { success: false, message: 'No records found.' };
+
+  const headers = values[0];
+  const idColumn = headers.indexOf(idField);
+  if (idColumn === -1) return { success: false, message: 'Invalid id field: ' + idField };
+
+  for (let rowIndex = 1; rowIndex < values.length; rowIndex += 1) {
+    if (String(values[rowIndex][idColumn]) !== String(idValue)) continue;
+    sheet.deleteRow(rowIndex + 1);
+    return { success: true };
+  }
+
+  return { success: false, message: idField + ' not found' };
+}
+
 function parseFormUrlEncoded(str) {
   const out = {};
   if (!str) return out;
@@ -269,5 +395,5 @@ function parseFormUrlEncoded(str) {
 }
 
 //function jsonResponse(payload) {
-  //return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
+//return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON);
 //}

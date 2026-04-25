@@ -25,6 +25,7 @@ function formatScheduleTime(value) {
 
 function Dashboard() {
   const [schedule, setSchedule] = useState([]);
+  const [selectedSeva, setSelectedSeva] = useState('all');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -44,13 +45,34 @@ function Dashboard() {
 
   const today = dayjs().format('YYYY-MM-DD');
   const todaySevas = useMemo(() => schedule.filter((item) => item.date === today), [schedule, today]);
+
   const upcomingWeek = useMemo(() => {
-    const end = dayjs().add(7, 'day');
-    return schedule.filter((item) => {
-      const date = dayjs(item.date);
-      return (date.isAfter(dayjs(), 'day') || date.isSame(dayjs(), 'day')) && (date.isBefore(end, 'day') || date.isSame(end, 'day'));
-    });
+    const todayDate = dayjs();
+    const end = todayDate.add(7, 'day');
+
+    return schedule
+      .filter((item) => {
+        const date = dayjs(item.date);
+        return (date.isAfter(todayDate, 'day') || date.isSame(todayDate, 'day'))
+          && (date.isBefore(end, 'day') || date.isSame(end, 'day'));
+      })
+      .sort((a, b) => {
+        if (a.date === b.date) {
+          return String(a.start_time || '').localeCompare(String(b.start_time || ''));
+        }
+        return String(a.date).localeCompare(String(b.date));
+      });
   }, [schedule]);
+
+  const upcomingSevaOptions = useMemo(
+    () => Array.from(new Set(upcomingWeek.map((item) => item.seva_name))).sort((a, b) => a.localeCompare(b)),
+    [upcomingWeek]
+  );
+
+  const filteredUpcomingWeek = useMemo(() => {
+    if (selectedSeva === 'all') return upcomingWeek;
+    return upcomingWeek.filter((item) => item.seva_name === selectedSeva);
+  }, [upcomingWeek, selectedSeva]);
 
   return (
     <section className="space-y-4">
@@ -70,10 +92,26 @@ function Dashboard() {
         )}
       </div>
       <div className="rounded-xl border p-4">
-        <h2 className="text-lg font-semibold">Upcoming 7 Days</h2>
-        {upcomingWeek.length === 0 ? <p className="text-sm text-slate-500">No upcoming sevas.</p> : (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-lg font-semibold">Upcoming 7 Days</h2>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <span>Filter by Seva:</span>
+            <select
+              className="rounded border p-2"
+              value={selectedSeva}
+              onChange={(event) => setSelectedSeva(event.target.value)}
+            >
+              <option value="all">All Sevas</option>
+              {upcomingSevaOptions.map((sevaName) => (
+                <option key={sevaName} value={sevaName}>{sevaName}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {filteredUpcomingWeek.length === 0 ? <p className="pt-2 text-sm text-slate-500">No upcoming sevas.</p> : (
           <ul className="space-y-2 pt-2">
-            {upcomingWeek.map((event) => (
+            {filteredUpcomingWeek.map((event) => (
               <li className="rounded-lg bg-slate-50 p-3" key={`${event.assignment_id}-${event.date}-upcoming`}>
                 <p className="font-medium">{event.date}: {event.seva_name}</p>
                 <p className="text-sm">{event.sevekari_name} · {formatScheduleTime(event.start_time)} - {formatScheduleTime(event.end_time)}</p>
