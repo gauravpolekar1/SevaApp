@@ -179,8 +179,9 @@ function expandDates(startDate, endDate, recurrenceDays) {
   if (!recurrenceDays || typeof recurrenceDays !== 'string') return [];
   const wantedDays = recurrenceDays.split(',').map(function (d) { return d.trim(); });
   const dayMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const start = new Date(startDate + 'T00:00:00');
-  const end = new Date(endDate + 'T00:00:00');
+  const start = parseDateValue(startDate);
+  const end = parseDateValue(endDate);
+  if (!start || !end) return [];
 
   const dates = [];
   const cursor = new Date(start);
@@ -191,6 +192,31 @@ function expandDates(startDate, endDate, recurrenceDays) {
     cursor.setDate(cursor.getDate() + 1);
   }
   return dates;
+}
+
+function parseDateValue(value) {
+  if (!value && value !== 0) return null;
+
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    const normalized = new Date(value.getTime());
+    normalized.setHours(0, 0, 0, 0);
+    return normalized;
+  }
+
+  const text = String(value).trim();
+  if (!text) return null;
+
+  // Most common input format from Sheets/API: YYYY-MM-DD
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoMatch) {
+    return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+  }
+
+  // Fallback for locale/date-time text values that may come from Sheets.
+  const parsed = new Date(text);
+  if (isNaN(parsed.getTime())) return null;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
 }
 
 function timeOverlap(startA, endA, startB, endB) {
