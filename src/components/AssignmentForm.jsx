@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import DayPicker from './DayPicker';
 
 const initialState = {
@@ -10,18 +10,29 @@ const initialState = {
   recurrence_days: 'Mon,Tue,Wed,Thu,Fri,Sat,Sun',
 };
 
-function AssignmentForm({ sevas, sevekari, onSubmit, loading }) {
+function AssignmentForm({ sevas, sevekari, onSubmit, loading, initialData = null, onCancel }) {
   const [formData, setFormData] = useState(initialState);
+  const isEditMode = Boolean(initialData?.assignment_id);
+
+  useEffect(() => {
+    if (isEditMode) {
+      setFormData({ ...initialState, ...initialData });
+      return;
+    }
+    setFormData(initialState);
+  }, [initialData, isEditMode]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     await onSubmit(formData);
-    setFormData(initialState);
+    if (!isEditMode) {
+      setFormData(initialState);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border p-4">
-      <h2 className="text-lg font-semibold">Assign Seva</h2>
+      <h2 className="text-lg font-semibold">{isEditMode ? 'Edit Assignment' : 'Assign Seva'}</h2>
       <select className="w-full rounded border p-3" value={formData.seva_id} onChange={(e) => setFormData({ ...formData, seva_id: e.target.value })} required>
         <option value="">Select Seva</option>
         {sevas.map((seva) => (
@@ -44,7 +55,16 @@ function AssignmentForm({ sevas, sevekari, onSubmit, loading }) {
         value={formData.recurrence_days}
         onChange={(recurrence_days) => setFormData({ ...formData, recurrence_days })}
       />
-      <button className="w-full rounded bg-orange-600 p-3 font-medium text-white" disabled={loading} type="submit">{loading ? 'Assigning...' : 'Assign Seva'}</button>
+      <div className="flex gap-2">
+        <button className="w-full rounded bg-orange-600 p-3 font-medium text-white" disabled={loading} type="submit">
+          {loading ? 'Saving...' : isEditMode ? 'Update Assignment' : 'Assign Seva'}
+        </button>
+        {isEditMode && (
+          <button className="rounded border px-4" disabled={loading} onClick={onCancel} type="button">
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   );
 }
