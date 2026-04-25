@@ -3,6 +3,26 @@ import dayjs from 'dayjs';
 import { getSchedule } from '../services/api';
 import { getErrorMessage } from '../utils/errorMessage';
 
+const DISPLAY_TIME_FORMAT = 'HH:mm';
+
+function formatScheduleTime(value) {
+  if (!value && value !== 0) return '';
+
+  const raw = String(value).trim();
+  if (!raw) return '';
+
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(raw)) {
+    return raw.slice(0, 5);
+  }
+
+  const parsed = dayjs(raw);
+  if (parsed.isValid()) {
+    return parsed.format(DISPLAY_TIME_FORMAT);
+  }
+
+  return raw;
+}
+
 function Dashboard() {
   const [schedule, setSchedule] = useState([]);
   const [error, setError] = useState('');
@@ -43,7 +63,7 @@ function Dashboard() {
             {todaySevas.map((event) => (
               <li className="rounded-lg bg-slate-50 p-3" key={`${event.assignment_id}-${event.date}`}>
                 <p className="font-medium">{event.seva_name}</p>
-                <p className="text-sm">{event.sevekari_name} · {event.start_time} - {event.end_time}</p>
+                <p className="text-sm">{event.sevekari_name} · {formatScheduleTime(event.start_time)} - {formatScheduleTime(event.end_time)}</p>
               </li>
             ))}
           </ul>
@@ -56,7 +76,7 @@ function Dashboard() {
             {upcomingWeek.map((event) => (
               <li className="rounded-lg bg-slate-50 p-3" key={`${event.assignment_id}-${event.date}-upcoming`}>
                 <p className="font-medium">{event.date}: {event.seva_name}</p>
-                <p className="text-sm">{event.sevekari_name} · {event.start_time} - {event.end_time}</p>
+                <p className="text-sm">{event.sevekari_name} · {formatScheduleTime(event.start_time)} - {formatScheduleTime(event.end_time)}</p>
               </li>
             ))}
           </ul>
